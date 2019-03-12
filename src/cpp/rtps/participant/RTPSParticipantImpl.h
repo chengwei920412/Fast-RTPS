@@ -464,7 +464,7 @@ private:
           */
         static const int MutationTries = 100;
         void createReceiverResources(LocatorList_t& Locator_list, bool ApplyMutation);
-        void createSenderResources(LocatorList_t& Locator_list, bool ApplyMutation);
+        void createSenderResources(LocatorList_t& locator_list);
 
         bool networkFactoryHasRegisteredTransports() const;
 
