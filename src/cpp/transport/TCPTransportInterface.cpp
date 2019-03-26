@@ -393,6 +393,7 @@ bool TCPTransportInterface::init()
     auto ioServiceFunction = [&]()
     {
         io_service::work work(io_service_);
+        /*
         TCPKeepAliveEvent keep_alive_event(*this, io_service_, *io_service_thread_.get(),
                 configuration()->keep_alive_frequency_ms);
 
@@ -400,7 +401,7 @@ bool TCPTransportInterface::init()
         {
             keep_alive_event.restart_timer();
         }
-
+        */
         io_service_.run();
     };
     io_service_thread_.reset(new std::thread(ioServiceFunction));
@@ -495,7 +496,7 @@ bool TCPTransportInterface::CloseInputChannel(const Locator_t& locator)
             }
 
             receiver_in_use->cv.wait(scopedLock, [&]() { return receiver_in_use->in_use == false; });
-            std::cout << "ClosePort for " << locator << std::endl;
+            //std::cout << "ClosePort for " << locator << std::endl;
             delete receiver_in_use;
         }
     }
@@ -552,7 +553,23 @@ bool TCPTransportInterface::OpenOutputChannel(
                 }
 
                 return true;
-            }
+            }/*
+            else if (tcp_sender_resource)// WAN case
+            {
+                Locator_t wan_locator;
+                wan_locator.kind = physical_locator.kind;
+                wan_locator.port = physical_locator.port; // Copy physical's port
+                IPLocator::setIPv4(wan_locator, IPLocator::toWanstring(physical_locator)); // WAN to IP
+                if (wan_locator == tcp_sender_resource->channel()->locator())
+                {
+                    if(!tcp_sender_resource->channel()->is_logical_port_added(logical_port))
+                    {
+                        tcp_sender_resource->channel()->add_logical_port(logical_port);
+                    }
+
+                    return true;
+                }
+            }*/
         }
 
         // At this point, if there no SenderResource to reuse, the channel was created for reception (through an
@@ -590,6 +607,7 @@ bool TCPTransportInterface::OpenOutputChannel(
             logInfo(OpenOutputChannel, "OpenOutputChannel (physical: "
                 << IPLocator::getPhysicalPort(locator) << "; logical: "
                 << IPLocator::getLogicalPort(locator) << ") @ " << IPLocator::to_string(locator));
+            //std::cout << "OpenOutputPort for " << IPLocator::to_string(locator) << std::endl;
 
             channel.reset(
 #if TLS_FOUND
@@ -632,7 +650,7 @@ bool TCPTransportInterface::OpenInputChannel(
                 std::unique_lock<std::mutex> scopedLock(sockets_map_mutex_);
                 receiver_resources_[logicalPort] = std::pair<TransportReceiverInterface*, ReceiverInUseCV*>
                     (receiver, new ReceiverInUseCV());
-                std::cout << "OpenPort for " << locator << std::endl;
+                //std::cout << "OpenInputPort for " << IPLocator::to_string(locator) << std::endl;
             }
 
             logInfo(RTCP, " OpenInputChannel (physical: " << IPLocator::getPhysicalPort(locator) << "; logical: " << \
@@ -731,6 +749,7 @@ void TCPTransportInterface::perform_listen_operation(
         }
         else
         {
+            //std::cout << "No TransportReceiverInterface attached: " << logicalPort << std::endl;
             logWarning(RTCP, "Received Message, but no TransportReceiverInterface attached: " << logicalPort);
         }
     }
@@ -928,9 +947,17 @@ bool TCPTransportInterface::send(
     if (channel->locator() != IPLocator::toPhysicalLocator(remote_locator) ||
             send_buffer_size > configuration()->sendBufferSize)
     {
-        logWarning(RTCP, "SEND [RTPS] Failed: Not connect: " << IPLocator::getLogicalPort(remote_locator) \
-            << " @ IP: " << IPLocator::toIPv4string(remote_locator));
-        return false;
+        // Check WAN too.
+        Locator_t wan_locator;
+        wan_locator.kind = remote_locator.kind;
+        wan_locator.port = IPLocator::toPhysicalLocator(remote_locator).port; // Copy physical's port
+        IPLocator::setIPv4(wan_locator, IPLocator::toWanstring(remote_locator)); // WAN to IP
+        if (wan_locator != channel->locator())
+        {
+            logWarning(RTCP, "SEND [RTPS] Failed: Not connect: " << IPLocator::getLogicalPort(remote_locator) \
+                << " @ IP: " << IPLocator::toIPv4string(remote_locator));
+            return false;
+        }
     }
 
     bool success = false;
