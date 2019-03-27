@@ -39,7 +39,7 @@
 #include <fastrtps/log/Log.h>
 
 namespace eprosima {
-namespace fastrtps{
+namespace fastrtps {
 namespace rtps {
 
 
@@ -145,24 +145,11 @@ void PDPSimpleListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheCha
     }
     else
     {
-
-        this->mp_SPDP->lookupParticipantProxyData(guid, participant_data);
-
-        ParticipantDiscoveryInfo info(participant_data);
-        info.status = ParticipantDiscoveryInfo::REMOVED_PARTICIPANT;
-
-        if(this->mp_SPDP->removeRemoteParticipant(guid))
-        {
-            auto listener = this->mp_SPDP->getRTPSParticipant()->getListener();
-            if(listener != nullptr)
-            {
-                listener->onParticipantDiscovery(this->mp_SPDP->getRTPSParticipant()->getUserRTPSParticipant(), std::move(info));
-            }
-        }
+        mp_SPDP->remove_remote_participant(guid, ParticipantDiscoveryInfo::REMOVED_PARTICIPANT);
     }
 
     //Remove change form history.
-    this->mp_SPDP->mp_SPDPReaderHistory->remove_change(change);
+    mp_SPDP->mp_SPDPReaderHistory->remove_change(change);
 
     return;
 }
@@ -172,8 +159,6 @@ bool PDPSimpleListener::getKey(CacheChange_t* change)
     return ParameterList::readInstanceHandleFromCDRMsg(change, PID_PARTICIPANT_GUID);
 }
 
-
-
-}
 } /* namespace rtps */
+} /* namespace fastrtps */
 } /* namespace eprosima */
